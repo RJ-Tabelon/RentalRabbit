@@ -4,13 +4,38 @@ import Navbar from '@/components/Navbar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import Sidebar from '@/components/AppSidebar';
 import { NAVBAR_HEIGHT } from '@/lib/constants';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useGetAuthorUserQuery } from '@/state/api';
+import { usePathname, useRouter } from 'next/navigation';
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
-  const { data: authUser } = useGetAuthorUserQuery();
+  const { data: authUser, isLoading: authLoading } = useGetAuthorUserQuery();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(true);
 
-if (!authUser?.userRole) return null;
+  useEffect(() => {
+    if (authUser) {
+      const userRole = authUser.userRole?.toLowerCase();
+      if (
+        (userRole === 'manager' && pathname.startsWith('/tenants')) ||
+        (userRole === 'tenant' && pathname.startsWith('/managers'))
+      ) {
+        router.push(
+          userRole === 'manager'
+            ? '/managers/properties'
+            : '/tenants/favorites',
+          { scroll: false }
+        );
+      } else {
+        setIsLoading(false);
+      }
+    }
+  }, [authUser, router, pathname]);
+
+  if (authLoading || isLoading) return <>Loading...</>
+
+  if (!authUser?.userRole) return null;
 
   return (
     <SidebarProvider>
