@@ -1,13 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createManager = exports.getManager = void 0;
+exports.updateManager = exports.createManager = exports.getManager = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 const getManager = async (req, res) => {
     try {
         const { cognitoId } = req.params;
         const manager = await prisma.manager.findUnique({
-            where: { cognitoId: cognitoId },
+            where: { cognitoId: cognitoId }
         });
         if (manager) {
             res.json(manager);
@@ -43,4 +43,25 @@ const createManager = async (req, res) => {
     }
 };
 exports.createManager = createManager;
+const updateManager = async (req, res) => {
+    try {
+        const { cognitoId } = req.params;
+        const { name, email, phoneNumber } = req.body;
+        const updateManager = await prisma.manager.update({
+            where: { cognitoId: cognitoId },
+            data: {
+                name,
+                email,
+                phoneNumber
+            }
+        });
+        res.json(updateManager);
+    }
+    catch (error) {
+        res
+            .status(500)
+            .json({ message: `Error updating manager: ${error.message}` });
+    }
+};
+exports.updateManager = updateManager;
 //# sourceMappingURL=managerControllers.js.map
