@@ -133,11 +133,50 @@ export const getProperties = async (
 
     const properties = await prisma.$queryRaw(completeQuery);
 
-    res.json(properties)
-
+    res.json(properties);
   } catch (error: any) {
     res
       .status(500)
       .json({ message: `Error retrieving properties: ${error.message}` });
+  }
+};
+
+export const getProperty = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const property = await prisma.property.findUnique({
+      where: { id: Number(id) },
+      include: {
+        location: true
+      }
+    });
+
+    if (property) {
+      const coordinates: { coordinates: string }[] =
+        await prisma.$queryRaw`SELECT ST_asText(coordinates) as coordinates from "Location" where id = ${property.location.id}`;
+
+      const geoJSON: any = wktToGeoJSON(coordinates[0]?.coordinates || '');
+      const longitude = geoJSON.coordinates[0];
+      const latitude = geoJSON.coordinates[1];
+
+      const propertyWithCoordinates = {
+        ...property,
+        location: {
+          ...property.location,
+          coordinates: {
+            longitude,
+            latitude
+          }
+        }
+      };
+      res.json(propertyWithCoordinates);
+    }
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: `Error retrieving property: ${err.message}` });
   }
 };
