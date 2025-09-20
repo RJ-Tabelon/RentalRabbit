@@ -83,7 +83,7 @@ export const getCurrentResidences = async (
   res: Response // res = the response we will send back to the client
 ): Promise<void> => {
   try {
-    // Get the tenant's ID from the request URL (example: /residences/12345).
+    // Get the tenant's ID from the request URL 
     const { cognitoId } = req.params;
 
     // Find all properties from the database where this tenant lives.
@@ -142,7 +142,7 @@ export const addFavoriteProperty = async (
   res: Response // res = what we will send back to the client
 ): Promise<void> => {
   try {
-    // Get the tenant's ID and the property ID from the URL (example: /favorite/tenantId/propertyId)
+    // Get the tenant's ID and the property ID from the URL
     const { cognitoId, propertyId } = req.params;
 
     // Find the tenant in the database by their Cognito ID
@@ -196,7 +196,7 @@ export const removeFavoriteProperty = async (
   res: Response // res = the response we will send back to the client
 ): Promise<void> => {
   try {
-    // Get the tenant's ID and the property ID from the URL (example: /favorites/remove/tenantId/propertyId)
+    // Get the tenant's ID and the property ID from the URL
     const { cognitoId, propertyId } = req.params;
 
     // Convert the property ID from a string to a number
