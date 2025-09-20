@@ -24,3 +24,26 @@ export const getLeases = async (req: Request, res: Response): Promise<void> => {
       .json({ message: `Error retrieving leases: ${error.message}` });
   }
 };
+
+// This function gets all payments for a specific lease from the database
+export const getLeasePayments = async (
+  req: Request, // req = the request from the client
+  res: Response // res = what we will send back to the client
+): Promise<void> => {
+  try {
+    // Get the lease ID from the URL
+    const { id } = req.params;
+
+    // Find all payments in the database where the leaseId matches the given ID
+    const payments = await prisma.payment.findMany({
+      where: { leaseId: Number(id) } // Convert id from string to number
+    });
+
+    // Send the payments back to the client as JSON
+    res.json(payments);
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: `Error retrieving lease payments: ${error.message}` });
+  }
+};
