@@ -135,4 +135,57 @@ export const getCurrentResidences = async (
   }
 };
 
+// This function adds a property to a tenant's list of favorite properties.
+// It checks if the tenant exists, and also checks if the property is already a favorite.
+export const addFavoriteProperty = async (
+  req: Request, // req = request from the client
+  res: Response // res = what we will send back to the client
+): Promise<void> => {
+  try {
+    // Get the tenant's ID and the property ID from the URL (example: /favorite/tenantId/propertyId)
+    const { cognitoId, propertyId } = req.params;
 
+    // Find the tenant in the database by their Cognito ID
+    // Also get their current list of favorite properties
+    const tenant = await prisma.tenant.findUnique({
+      where: { cognitoId: cognitoId as string },
+      include: { favorites: true }
+    });
+
+    // If the tenant doesn't exist, send a 404 error and stop the function
+    if (!tenant) {
+      res.status(404).json({ message: 'Tenant not found' });
+      return;
+    }
+
+    // Convert the property ID from a string to a number
+    const propertyIdNumber = Number(propertyId);
+
+    // Get the tenant's current favorites (or empty array if none)
+    const existingFavorites = tenant.favorites || [];
+
+    // Check if this property is already in the tenant's favorites
+    if (!existingFavorites.some(fav => fav.id === propertyIdNumber)) {
+      // If not, update the tenant in the database to add this property to favorites
+      const updatedTenant = await prisma.tenant.update({
+        where: { cognitoId: cognitoId as string },
+        data: {
+          favorites: {
+            connect: { id: propertyIdNumber } // Connect this property to the tenant's favorites
+          }
+        },
+        include: { favorites: true } // Return the updated list of favorites
+      });
+
+      // Send the updated tenant back as JSON
+      res.json(updatedTenant);
+    } else {
+      // If the property is already a favorite, send a 409 conflict error
+      res.status(409).json({ message: 'Property already added as favorite' });
+    }
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: `Error adding favorite property: ${error.message}` });
+  }
+};
