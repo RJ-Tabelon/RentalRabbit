@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { wktToGeoJSON } from '@terraformer/wkt';
 
 const prisma = new PrismaClient();
 
@@ -73,3 +74,60 @@ export const updateManager = async (
       .json({ message: `Error updating manager: ${error.message}` });
   }
 };
+
+// This function gets all the properties that belong to a specific manager.
+export const getManagerProperties = async (
+  req: Request, // req = the request coming from the client (like the browser or app)
+  res: Response // res = what we send back to the client as a response
+): Promise<void> => {
+  try {
+    // Get the manager's ID from the request parameters (like /manager/1234).
+    const { cognitoId } = req.params;
+
+    // Find all properties in the database where "managerCognitoId" matches this ID.
+    // Also, include the "location" info for each property.
+    const properties = await prisma.property.findMany({
+      where: { managerCognitoId: cognitoId as string },
+      include: {
+        location: true
+      }
+    });
+
+    // Go through each property and reformat its location so it has
+    // longitude and latitude instead of just raw coordinates.
+    const propertiesWithFormattedLocation = await Promise.all(
+      properties.map(async property => {
+        // Run a raw SQL query to get the location coordinates (as text).
+        const coordinates: { coordinates: string }[] =
+          await prisma.$queryRaw`SELECT ST_asText(coordinates) as coordinates from "Location" where id = ${property.location.id}`;
+
+        // Convert the coordinates text (WKT format) into GeoJSON (a standard map format).
+        const geoJSON: any = wktToGeoJSON(coordinates[0]?.coordinates || '');
+
+        // Extract longitude and latitude values from the GeoJSON data.
+        const longitude = geoJSON.coordinates[0];
+        const latitude = geoJSON.coordinates[1];
+
+        // Return the property with the location formatted nicely (with longitude and latitude).
+        return {
+          ...property,
+          location: {
+            ...property.location,
+            coordinates: {
+              longitude,
+              latitude
+            }
+          }
+        };
+      })
+    );
+
+    // Send back the list of properties (with nice location data) to the client as JSON.
+    res.json(propertiesWithFormattedLocation);
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: `Error retrieving manager properties: ${err.message}` });
+  }
+};
+
