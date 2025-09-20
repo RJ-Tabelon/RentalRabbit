@@ -189,3 +189,36 @@ export const addFavoriteProperty = async (
       .json({ message: `Error adding favorite property: ${error.message}` });
   }
 };
+
+// This function removes a property from a tenant's list of favorite properties.
+export const removeFavoriteProperty = async (
+  req: Request, // req = the request from the client
+  res: Response // res = the response we will send back to the client
+): Promise<void> => {
+  try {
+    // Get the tenant's ID and the property ID from the URL (example: /favorites/remove/tenantId/propertyId)
+    const { cognitoId, propertyId } = req.params;
+
+    // Convert the property ID from a string to a number
+    const propertyIdNumber = Number(propertyId);
+
+    // Update the tenant in the database
+    // "disconnect" removes the connection between this tenant and the property
+    const updatedTenant = await prisma.tenant.update({
+      where: { cognitoId: cognitoId as string },
+      data: {
+        favorites: {
+          disconnect: { id: propertyIdNumber } // Remove this property from favorites
+        }
+      },
+      include: { favorites: true } // Return the updated list of favorite properties
+    });
+
+    // Send back the updated tenant (with new favorites) as JSON
+    res.json(updatedTenant);
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: `Error removing favorite property: ${err.message}` });
+  }
+};
