@@ -1,7 +1,16 @@
 import { Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { wktToGeoJSON } from '@terraformer/wkt';
+import { S3Client } from '@aws-sdk/client-s3';
+import { Location } from '@prisma/client';
+import { Upload } from '@aws-sdk/lib-storage';
+import axios from 'axios';
 
 const prisma = new PrismaClient();
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION ?? 'us-east-1'
+});
 
 export const getProperties = async (
   req: Request,
@@ -178,5 +187,129 @@ export const getProperty = async (
     res
       .status(500)
       .json({ message: `Error retrieving property: ${err.message}` });
+  }
+};
+
+// This function creates a new property (a rental listing).
+// It takes information from the request (req), saves photos to AWS S3,
+// looks up the address location (longitude/latitude), and stores everything in the database.
+
+export const createProperty = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    // Get all uploaded files (like property photos) from the request
+    const files = req.files as Express.Multer.File[];
+
+    // Get property info from the request body
+    // The `...propertyData` means "everything else that wasn't listed above"
+    const {
+      address,
+      city,
+      state,
+      country,
+      postalCode,
+      managerCognitoId,
+      ...propertyData
+    } = req.body;
+
+    // Upload all photos to AWS S3 and get their URLs
+    const photoUrls = await Promise.all(
+      files.map(async file => {
+        // Info needed for the upload (bucket, filename, file content, type)
+        const uploadParams = {
+          Bucket: process.env.S3_BUCKET_NAME!, // S3 bucket name (from .env file)
+          Key: `properties/${Date.now()}-${file.originalname}`, // unique filename
+          Body: file.buffer, // the actual file content
+          ContentType: file.mimetype // file type (like image/jpeg)
+        };
+
+        // Upload the file to S3
+        const uploadResult = await new Upload({
+          client: s3Client,
+          params: uploadParams
+        }).done();
+
+        // Return the web URL of the uploaded photo
+        return uploadResult.Location;
+      })
+    );
+
+    // Build a URL to ask OpenStreetMap for latitude/longitude of the property
+    const geocodingUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(
+      {
+        street: address,
+        city,
+        country,
+        postalCode: postalCode,
+        format: 'json',
+        limit: '1'
+      }
+    ).toString()}`;
+
+    // Send a request to OpenStreetMap API to get location coordinates
+    const geocodingResponse = await axios.get(geocodingUrl, {
+      headers: {
+        'User-Agent': 'RentalRabbit (123@gmail.com)' // required by the API
+      }
+    });
+
+    // Extract longitude and latitude from the response, or default to [0,0] if missing
+    const [longitude, latitude] =
+      geocodingResponse.data[0]?.lon && geocodingResponse.data[0]?.lat
+        ? [
+            parseFloat(geocodingResponse.data[0]?.lon),
+            parseFloat(geocodingResponse.data[0]?.lat)
+          ]
+        : [0, 0];
+
+    // Save the location details in the database (Postgres with PostGIS for maps)
+    const [location] = await prisma.$queryRaw<Location[]>`
+      INSERT INTO "Location" (address, city, state, country, "postalCode", coordinates)
+      VALUES (${address}, ${city}, ${state}, ${country}, ${postalCode}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326))
+      RETURNING id, address, city, state, country, "postalCode", ST_AsText(coordinates) as coordinates;
+    `;
+
+    // Create the actual property record in the database
+    const newProperty = await prisma.property.create({
+      data: {
+        ...propertyData, // everything else that was passed in req.body
+        photoUrls, // all the S3 photo URLs
+        locationId: location?.id, // link to the saved location
+        managerCognitoId, // ID of the manager who owns this property
+
+        // Split strings like "wifi, pool, gym" into arrays
+        amenities:
+          typeof propertyData.amenities === 'string'
+            ? propertyData.amenities.split(',')
+            : [],
+        highlights:
+          typeof propertyData.highlights === 'string'
+            ? propertyData.highlights.split(',')
+            : [],
+
+        // Convert strings to correct types (true/false, numbers, etc.)
+        isPetsAllowed: propertyData.isPetsAllowed === 'true',
+        isParkingIncluded: propertyData.isParkingIncluded === 'true',
+        pricePerMonth: parseFloat(propertyData.pricePerMonth),
+        securityDeposit: parseFloat(propertyData.securityDeposit),
+        applicationFee: parseFloat(propertyData.applicationFee),
+        beds: parseInt(propertyData.beds),
+        baths: parseFloat(propertyData.baths),
+        squareFeet: parseInt(propertyData.squareFeet)
+      },
+      include: {
+        location: true, // also return location data
+        manager: true // also return manager data
+      }
+    });
+
+    // Send back the new property info with status 201 (Created)
+    res.status(201).json(newProperty);
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: `Error creating property: ${err.message}` });
   }
 };
