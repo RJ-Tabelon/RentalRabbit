@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import React from 'react';
 import { Button } from './ui/button';
-import { useGetAuthorUserQuery } from '@/state/api';
+import { useGetAuthUserQuery } from '@/state/api';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { Bell, MessageCircle, Plus, Search } from 'lucide-react';
@@ -20,7 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { SidebarTrigger } from './ui/sidebar';
 
 const Navbar = () => {
-  const { data: authUser } = useGetAuthorUserQuery();
+  const { data: authUser } = useGetAuthUserQuery();
   const router = useRouter();
   const pathname = usePathname();
 

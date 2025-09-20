@@ -14,7 +14,6 @@ import '@aws-amplify/ui-react/styles.css';
 import { useRouter, usePathname } from 'next/navigation';
 
 // https://docs.amplify.aws/gen1/javascript/tools/libraries/configure-categories/
-
 Amplify.configure({
   Auth: {
     Cognito: {
@@ -78,6 +77,7 @@ const components = {
         </>
       );
     },
+
     Footer() {
       const { toSignIn } = useAuthenticator();
       return (
@@ -119,7 +119,7 @@ const formFields = {
     },
     email: {
       order: 2,
-      placeholder: 'Enter your email',
+      placeholder: 'Enter your email address',
       label: 'Email',
       isRequired: true
     },
@@ -162,9 +162,9 @@ const Auth = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className='h-full'>
       <Authenticator
+        initialState={pathname.includes('signup') ? 'signUp' : 'signIn'}
         components={components}
         formFields={formFields}
-        initialState={pathname.includes('signup') ? 'signUp' : 'signIn'}
       >
         {() => <>{children}</>}
       </Authenticator>

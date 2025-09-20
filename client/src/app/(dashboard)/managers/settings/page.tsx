@@ -1,13 +1,13 @@
 'use client';
 import SettingsForm from '@/components/SettingsForm';
 import {
-  useGetAuthorUserQuery,
+  useGetAuthUserQuery,
   useUpdateManagerSettingsMutation
 } from '@/state/api';
 import React from 'react';
 
 const ManagerSettings = () => {
-  const { data: authUser, isLoading } = useGetAuthorUserQuery();
+  const { data: authUser, isLoading } = useGetAuthUserQuery();
   const [updateManager] = useUpdateManagerSettingsMutation();
 
   if (isLoading) return <>Loading...</>;

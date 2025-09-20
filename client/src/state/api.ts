@@ -16,9 +16,17 @@ export const api = createApi({
     }
   }),
   reducerPath: 'api',
-  tagTypes: ['Managers', 'Tenants'],
+  tagTypes: [
+    'Managers',
+    'Tenants',
+    'Properties',
+    'PropertyDetails',
+    'Leases',
+    'Payments',
+    'Applications'
+  ],
   endpoints: build => ({
-    getAuthorUser: build.query<User, void>({
+    getAuthUser: build.query<User, void>({
       queryFn: async (_, _queryApi, _extraoptions, fetchWithBQ) => {
         try {
           const session = await fetchAuthSession();
@@ -27,7 +35,7 @@ export const api = createApi({
           const userRole = idToken?.payload['custom:role'] as string;
 
           const endpoint =
-            userRole == 'manager'
+            userRole === 'manager'
               ? `/managers/${user.userId}`
               : `/tenants/${user.userId}`;
 
@@ -86,7 +94,7 @@ export const api = createApi({
 });
 
 export const {
-  useGetAuthorUserQuery,
+  useGetAuthUserQuery,
   useUpdateTenantSettingsMutation,
   useUpdateManagerSettingsMutation
 } = api;
