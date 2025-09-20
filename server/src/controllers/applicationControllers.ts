@@ -185,3 +185,94 @@ export const createApplication = async (
       .json({ message: `Error creating application: ${error.message}` });
   }
 };
+
+// This function updates the status of a rental application
+export const updateApplicationStatus = async (
+  req: Request, // The request from the client
+  res: Response // The response we will send back to the client
+): Promise<void> => {
+  try {
+    // Get the application ID from the URL
+    const { id } = req.params;
+
+    // Get the new status from the request body
+    const { status } = req.body;
+
+    // Find the application in the database by its ID
+    // Also include related property and tenant information
+    const application = await prisma.application.findUnique({
+      where: { id: Number(id) },
+      include: {
+        property: true,
+        tenant: true
+      }
+    });
+
+    // If the application doesn't exist, return a 404 error
+    if (!application) {
+      res.status(404).json({ message: 'Application not found.' });
+      return;
+    }
+
+    // If the status is "Approved", create a new lease
+    if (status === 'Approved') {
+      // Create a new lease for this tenant and property
+      const newLease = await prisma.lease.create({
+        data: {
+          startDate: new Date(), // Lease starts today
+          endDate: new Date(
+            new Date().setFullYear(new Date().getFullYear() + 1)
+          ), // Lease ends 1 year from today
+          rent: application.property.pricePerMonth, // Rent from property
+          deposit: application.property.securityDeposit, // Deposit from property
+          propertyId: application.propertyId, // Connect lease to property
+          tenantCognitoId: application.tenantCognitoId // Connect lease to tenant
+        }
+      });
+
+      // Update the property to connect this tenant (add tenant to property)
+      await prisma.property.update({
+        where: { id: application.propertyId },
+        data: {
+          tenants: {
+            connect: { cognitoId: application.tenantCognitoId }
+          }
+        }
+      });
+
+      // Update the application with the new status and the new lease ID
+      await prisma.application.update({
+        where: { id: Number(id) },
+        data: { status, leaseId: newLease.id },
+        include: {
+          property: true,
+          tenant: true,
+          lease: true
+        }
+      });
+    } else {
+      // For other statuses (like "Denied"), just update the status
+      await prisma.application.update({
+        where: { id: Number(id) },
+        data: { status }
+      });
+    }
+
+    // Get the updated application from the database including property, tenant, and lease
+    const updatedApplication = await prisma.application.findUnique({
+      where: { id: Number(id) },
+      include: {
+        property: true,
+        tenant: true,
+        lease: true
+      }
+    });
+
+    // Send the updated application back to the client as JSON
+    res.json(updatedApplication);
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: `Error updating application status: ${error.message}` });
+  }
+};
