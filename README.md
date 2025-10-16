@@ -2,6 +2,8 @@
 
 Scalable, full‑stack rental property platform with a Next.js frontend, an Express/Node.js backend, PostgreSQL + PostGIS, and AWS infrastructure. Built with production patterns: role‑based auth (AWS Cognito), server‑side filtering and geospatial search, image uploads to S3, and a responsive, modern UI.
 
+![Home.png](Home.png)
+
 ## What you can do
 
 - Sign up/sign in with role selection (Tenant or Manager) using AWS Cognito
